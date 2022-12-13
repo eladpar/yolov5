@@ -28,6 +28,12 @@ from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 from tqdm import tqdm
 
+##############################
+##############################
+import pyzed.sl as sl
+###########################
+#########################
+
 from utils.augmentations import (Albumentations, augment_hsv, classify_albumentations, classify_transforms, copy_paste,
                                  letterbox, mixup, random_perspective)
 from utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, TQDM_BAR_FORMAT, check_dataset, check_requirements,
@@ -363,6 +369,39 @@ class LoadStreams:
                 assert not is_colab(), '--source 0 webcam unsupported on Colab. Rerun command in a local environment.'
                 assert not is_kaggle(), '--source 0 webcam unsupported on Kaggle. Rerun command in a local environment.'
             cap = cv2.VideoCapture(s)
+
+
+            ########################################################################################################################
+            ######ELAD##############################################################################################################
+
+            self.zed = sl.Camera()
+
+            input_type = sl.InputType()
+            init = sl.InitParameters(input_t=input_type)
+            init.camera_resolution = sl.RESOLUTION.HD720
+            init.depth_mode = sl.DEPTH_MODE.PERFORMANCE
+            init.coordinate_units = sl.UNIT.MILLIMETER
+
+            # Open the camera
+            err = self.zed.open(init)
+            if err != sl.ERROR_CODE.SUCCESS :
+                print(repr(err))
+                self.zed.close()
+                exit(1)
+            # Set runtime parameters after opening the camera
+            self.runtime = sl.RuntimeParameters()
+            self.runtime.sensing_mode = sl.SENSING_MODE.STANDARD
+            # Prepare new image size to retrieve half-resolution images
+            self.image_size = self.zed.get_camera_information().camera_resolution
+            self.image_size.width = 640
+            self.image_size.height = 640
+            # Declare your sl.Mat matrices
+            self.image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
+            depth_image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
+            ##########################################################################################################################
+            ###########################################################################################################################
+
+
             assert cap.isOpened(), f'{st}Failed to open {s}'
             w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -370,7 +409,15 @@ class LoadStreams:
             self.frames[i] = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')  # infinite stream fallback
             self.fps[i] = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
 
-            _, self.imgs[i] = cap.read()  # guarantee first frame
+            # _, self.imgs[i] = cap.read()  # guarantee first frame
+            ###################Elad######################
+            err = self.zed.grab(self.runtime)
+            if err == sl.ERROR_CODE.SUCCESS:
+                self.zed.retrieve_image(self.image_zed, sl.VIEW.LEFT, sl.MEM.CPU, self.image_size)
+                img = cv2.cvtColor(self.image_zed.get_data(), cv2.COLOR_BGRA2BGR)
+                self.imgs[i] =  img
+            #############################################
+            
             self.threads[i] = Thread(target=self.update, args=([i, cap, s]), daemon=True)
             LOGGER.info(f"{st} Success ({self.frames[i]} frames {w}x{h} at {self.fps[i]:.2f} FPS)")
             self.threads[i].start()
@@ -391,13 +438,20 @@ class LoadStreams:
             n += 1
             cap.grab()  # .read() = .grab() followed by .retrieve()
             if n % self.vid_stride == 0:
-                success, im = cap.retrieve()
-                if success:
-                    self.imgs[i] = im
-                else:
-                    LOGGER.warning('WARNING ⚠️ Video stream unresponsive, please check your IP camera connection.')
-                    self.imgs[i] = np.zeros_like(self.imgs[i])
-                    cap.open(stream)  # re-open stream if signal was lost
+                # success, im = cap.retrieve()
+                #########################Elad#######################
+                err = self.zed.grab(self.runtime)
+                if err == sl.ERROR_CODE.SUCCESS:
+                    self.zed.retrieve_image(self.image_zed, sl.VIEW.LEFT, sl.MEM.CPU, self.image_size)
+                    img= cv2.cvtColor(self.image_zed.get_data(), cv2.COLOR_BGRA2BGR)
+                    self.imgs[i] =  img
+                # ##############################################
+                # if success:
+                #     self.imgs[i] = im
+                # else:
+                #     LOGGER.warning('WARNING ⚠️ Video stream unresponsive, please check your IP camera connection.')
+                #     self.imgs[i] = np.zeros_like(self.imgs[i])
+                #     cap.open(stream)  # re-open stream if signal was lost
             time.sleep(0.0)  # wait time
 
     def __iter__(self):
