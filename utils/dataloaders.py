@@ -397,7 +397,7 @@ class LoadStreams:
             self.image_size.height = 640
             # Declare your sl.Mat matrices
             self.image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
-            depth_image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
+            self.depth_image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
             ##########################################################################################################################
             ###########################################################################################################################
 
@@ -453,6 +453,16 @@ class LoadStreams:
                 #     self.imgs[i] = np.zeros_like(self.imgs[i])
                 #     cap.open(stream)  # re-open stream if signal was lost
             time.sleep(0.0)  # wait time
+
+    def get_depth(self):
+        img = None
+        err = self.zed.grab(self.runtime)
+        if err == sl.ERROR_CODE.SUCCESS:
+            # self.zed.retrieve_image(self.depth_image_zed, sl.VIEW.DEPTH, sl.MEM.CPU, self.image_size)
+            self.zed.retrieve_measure(self.depth_image_zed, sl.MEASURE.DEPTH, sl.MEM.CPU, self.image_size)
+            data = self.depth_image_zed.get_data()
+            # img= cv2.cvtColor(self.depth_image_zed.get_data(), cv2.COLOR_BGRA2BGR)
+        return data
 
     def __iter__(self):
         self.count = -1
