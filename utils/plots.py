@@ -81,6 +81,7 @@ class Annotator:
                                        size=font_size or max(round(sum(self.im.size) / 2 * 0.035), 12))
         else:  # use cv2
             self.im = im
+            self.im_gpu = im
         self.lw = line_width or max(round(sum(im.shape) / 2 * 0.003), 2)  # line width
 
     def box_label(self, box, label='', color=(128, 128, 128), txt_color=(255, 255, 255)):
@@ -130,16 +131,22 @@ class Annotator:
         colors = torch.tensor(colors, device=im_gpu.device, dtype=torch.float32) / 255.0
         colors = colors[:, None, None]  # shape(n,1,1,3)
         masks = masks.unsqueeze(3)  # shape(n,h,w,1)
-        masks_color = masks * (colors * alpha)  # shape(n,h,w,3)
+        masks_color = masks #* (colors * alpha)  # shape(n,h,w,3)
 
         inv_alph_masks = (1 - masks * alpha).cumprod(0)  # shape(n,h,w,1)
         mcs = (masks_color * inv_alph_masks).sum(0) * 2  # mask color summand shape(n,h,w,3)
 
         im_gpu = im_gpu.flip(dims=[0])  # flip channel
         im_gpu = im_gpu.permute(1, 2, 0).contiguous()  # shape(h,w,3)
-        im_gpu = im_gpu * inv_alph_masks[-1] + mcs
+        self.im_gpu = inv_alph_masks[-1] + mcs
+        # print(colors.cpu()[0][0][0][0])
         im_mask = (im_gpu * 255).byte().cpu().numpy()
-        self.im[:] = im_mask if retina_masks else scale_image(im_gpu.shape, im_mask, self.im.shape)
+        import sys
+        np.set_printoptions(threshold=sys.maxsize)
+        arr = np.asarray(im_mask)
+        print(arr)
+        print("##")
+        # self.im[:] = im_mask if retina_masks else scale_image(im_gpu.shape, im_mask, self.im.shape)
         if self.pil:
             # convert im back to PIL and update draw
             self.fromarray(self.im)
@@ -162,7 +169,7 @@ class Annotator:
 
     def result(self):
         # Return annotated image as array
-        return np.asarray(self.im)
+        return np.asarray(self.im_gpu.cpu())
 
 
 def feature_visualization(x, module_type, stage, n=32, save_dir=Path('runs/detect/exp')):
