@@ -167,18 +167,17 @@ def run(
 
                     # Write results
                     for *xyxy, conf, cls in reversed(det):
-                        if save_txt:  # Write to file
+                        depth = dataset.get_depth()
+                        if False:  # Write to file
                             xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                             line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
                             with open(f'{txt_path}.txt', 'a') as f:
                                 f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                        if save_img or save_crop or view_img:  # Add bbox to image
+                        if False:  # Add bbox to image
                             c = int(cls)  # integer class
                             label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                             
-
-                            depth = dataset.get_depth()
                             # depth = depth.cpu().copy()
                             depth_array = np.array(depth, dtype=np.float32)
                             ##############################Elad########################################################################
@@ -193,12 +192,12 @@ def run(
                             label = label + " " + str(depth_calc)
                             ########################################################################################################
                             annotator.box_label(xyxy, label, color=colors(c, True))
-                        if save_crop:
+                        if False:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
                 # Stream results
                 im0 = annotator.result()
-                if view_img:
+                if False:
                     if platform.system() == 'Linux' and p not in windows:
                         windows.append(p)
                         cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
@@ -211,7 +210,7 @@ def run(
                     cv2.waitKey(1)  # 1 millisecond
 
                 # Save results (image with detections)
-                if save_img:
+                if False:
                     if dataset.mode == 'image':
                         cv2.imwrite(save_path, im0)
                     else:  # 'video' or 'stream'
