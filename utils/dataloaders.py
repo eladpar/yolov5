@@ -455,7 +455,7 @@ class LoadStreams:
                 #     LOGGER.warning('WARNING ⚠️ Video stream unresponsive, please check your IP camera connection.')
                 #     self.imgs[i] = np.zeros_like(self.imgs[i])
                 #     cap.open(stream)  # re-open stream if signal was lost
-            time.sleep(0.01)  # wait time #TBD
+            time.sleep(0.03)  # wait time #TBD
 
     def get_depth(self):
         img = None
