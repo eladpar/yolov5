@@ -162,7 +162,7 @@ def run(
                     det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
 
                 # Segments
-                if save_txt:
+                if False:
                     segments = [
                         scale_segments(im0.shape if retina_masks else im.shape[2:], x, im0.shape, normalize=True)
                         for x in reversed(masks2segments(masks))]
@@ -181,16 +181,16 @@ def run(
 
                 # Write results
                 for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
-                    if save_txt:  # Write to file
+                    depth = dataset.get_depth()
+                    if False:  # Write to file
                         seg = segments[j].reshape(-1)  # (n,2) to (n*2)
                         line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
                         with open(f'{txt_path}.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                    if save_img or save_crop or view_img:  # Add bbox to image
+                    if False:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        depth = dataset.get_depth()
                         # depth = depth.cpu().copy()
                         # depth_array = np.array(depth, dtype=np.float32)
                         ##############################Elad########################################################################
@@ -206,12 +206,12 @@ def run(
                         ########################################################################################################
                         annotator.box_label(xyxy, label, color=colors(c, True))
                         # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
-                    if save_crop:
+                    if False:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
             # Stream results
             im0 = annotator.result()
-            if view_img:
+            if False:
                 if platform.system() == 'Linux' and p not in windows:
                     windows.append(p)
                     cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
@@ -221,7 +221,7 @@ def run(
                     exit()
 
             # Save results (image with detections)
-            if save_img:
+            if False:
                 if dataset.mode == 'image':
                     cv2.imwrite(save_path, im0)
                 else:  # 'video' or 'stream'
@@ -239,8 +239,9 @@ def run(
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer[i].write(im0)
 
-        # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        import time
+        LOGGER.info(f"{time.time()}{s}{'' if len(det) else '(no detections), '}{(dt[1].dt +dt[0].dt + dt[2].dt) * 1E3:.1f}ms post process time is {dt_post.dt * 1E3:.1f}ms"),
+
 
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
