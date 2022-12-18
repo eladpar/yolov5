@@ -117,6 +117,7 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+    dt_post = Profile()
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -139,105 +140,106 @@ def run(
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
-            seen += 1
-            if webcam:  # batch_size >= 1
-                p, im0, frame = path[i], im0s[i].copy(), dataset.count
-                s += f'{i}: '
-            else:
-                p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
-
-            p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # im.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
-            imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            if len(det):
-                if retina_masks:
-                    # scale bbox first the crop masks
-                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
-                    masks = process_mask_native(proto[i], det[:, 6:], det[:, :4], im0.shape[:2])  # HWC
+            with dt_post:
+                seen += 1
+                if webcam:  # batch_size >= 1
+                    p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                    s += f'{i}: '
                 else:
-                    masks = process_mask(proto[i], det[:, 6:], det[:, :4], im.shape[2:], upsample=True)  # HWC
-                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
+                    p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
-                # Segments
-                if False:
-                    segments = [
-                        scale_segments(im0.shape if retina_masks else im.shape[2:], x, im0.shape, normalize=True)
-                        for x in reversed(masks2segments(masks))]
+                p = Path(p)  # to Path
+                save_path = str(save_dir / p.name)  # im.jpg
+                txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+                s += '%gx%g ' % im.shape[2:]  # print string
+                imc = im0.copy() if save_crop else im0  # for save_crop
+                annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+                if len(det):
+                    if retina_masks:
+                        # scale bbox first the crop masks
+                        det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
+                        masks = process_mask_native(proto[i], det[:, 6:], det[:, :4], im0.shape[:2])  # HWC
+                    else:
+                        masks = process_mask(proto[i], det[:, 6:], det[:, :4], im.shape[2:], upsample=True)  # HWC
+                        det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
 
-                # Print results
-                for c in det[:, 5].unique():
-                    n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-                # Mask plotting
-                annotator.masks(
-                    masks,
-                    colors=[colors(x, True) for x in det[:, 5]],
-                    im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
-                    255 if retina_masks else im[i])
-
-                # Write results
-                for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
-                    depth = dataset.get_depth()
-                    if False:  # Write to file
-                        seg = segments[j].reshape(-1)  # (n,2) to (n*2)
-                        line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
-                        with open(f'{txt_path}.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
-                    if False:  # Add bbox to image
-                        c = int(cls)  # integer class
-                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        # depth = depth.cpu().copy()
-                        # depth_array = np.array(depth, dtype=np.float32)
-                        ##############################Elad########################################################################
-                        box = xyxy
-                        p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-                        center_x = (box[0] +box[2]) /2
-                        center_y = (box[0] +box[2]) /2
-                        center_x_cpu = int(center_x.cpu())
-                        center_y_cpu = int(center_y.cpu())
-                        depth_calc = depth[center_x_cpu][center_y_cpu]
-                        # print(f"label is {label} and center_x is {center_x} center_y is {center_y} and depth value is {depth_calc[0]}")
-                        label = label + " " + str(depth_calc)
-                        ########################################################################################################
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                        # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
+                    # Segments
                     if False:
-                        save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                        segments = [
+                            scale_segments(im0.shape if retina_masks else im.shape[2:], x, im0.shape, normalize=True)
+                            for x in reversed(masks2segments(masks))]
 
-            # Stream results
-            im0 = annotator.result()
-            if False:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
-                cv2.imshow(str(p), im0)
-                if cv2.waitKey(1) == ord('q'):  # 1 millisecond
-                    exit()
+                    # Print results
+                    for c in det[:, 5].unique():
+                        n = (det[:, 5] == c).sum()  # detections per class
+                        s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
-            # Save results (image with detections)
-            if False:
-                if dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
-                else:  # 'video' or 'stream'
-                    if vid_path[i] != save_path:  # new video
-                        vid_path[i] = save_path
-                        if isinstance(vid_writer[i], cv2.VideoWriter):
-                            vid_writer[i].release()  # release previous video writer
-                        if vid_cap:  # video
-                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
-                            fps, w, h = 30, im0.shape[1], im0.shape[0]
-                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                    vid_writer[i].write(im0)
+                    # Mask plotting
+                    annotator.masks(
+                        masks,
+                        colors=[colors(x, True) for x in det[:, 5]],
+                        im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
+                        255 if retina_masks else im[i])
+
+                    # Write results
+                    for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
+                        depth = dataset.get_depth()
+                        if False:  # Write to file
+                            seg = segments[j].reshape(-1)  # (n,2) to (n*2)
+                            line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
+                            with open(f'{txt_path}.txt', 'a') as f:
+                                f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                        if False:  # Add bbox to image
+                            c = int(cls)  # integer class
+                            label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                            # depth = depth.cpu().copy()
+                            # depth_array = np.array(depth, dtype=np.float32)
+                            ##############################Elad########################################################################
+                            box = xyxy
+                            p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+                            center_x = (box[0] +box[2]) /2
+                            center_y = (box[0] +box[2]) /2
+                            center_x_cpu = int(center_x.cpu())
+                            center_y_cpu = int(center_y.cpu())
+                            depth_calc = depth[center_x_cpu][center_y_cpu]
+                            # print(f"label is {label} and center_x is {center_x} center_y is {center_y} and depth value is {depth_calc[0]}")
+                            label = label + " " + str(depth_calc)
+                            ########################################################################################################
+                            annotator.box_label(xyxy, label, color=colors(c, True))
+                            # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
+                        if False:
+                            save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
+                # Stream results
+                im0 = annotator.result()
+                if False:
+                    if platform.system() == 'Linux' and p not in windows:
+                        windows.append(p)
+                        cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+                        cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
+                    cv2.imshow(str(p), im0)
+                    if cv2.waitKey(1) == ord('q'):  # 1 millisecond
+                        exit()
+
+                # Save results (image with detections)
+                if False:
+                    if dataset.mode == 'image':
+                        cv2.imwrite(save_path, im0)
+                    else:  # 'video' or 'stream'
+                        if vid_path[i] != save_path:  # new video
+                            vid_path[i] = save_path
+                            if isinstance(vid_writer[i], cv2.VideoWriter):
+                                vid_writer[i].release()  # release previous video writer
+                            if vid_cap:  # video
+                                fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                                w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                                h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                            else:  # stream
+                                fps, w, h = 30, im0.shape[1], im0.shape[0]
+                            save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                            vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                        vid_writer[i].write(im0)
 
         import time
         LOGGER.info(f"{time.time()}{s}{'' if len(det) else '(no detections), '}{(dt[1].dt +dt[0].dt + dt[2].dt) * 1E3:.1f}ms post process time is {dt_post.dt * 1E3:.1f}ms"),
