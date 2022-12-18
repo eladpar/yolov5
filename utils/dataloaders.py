@@ -410,7 +410,7 @@ class LoadStreams:
             # self.fps[i] = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
             ###################Elad######################
             self.frames[i] = float('inf')
-            self.fps[i] = 30 #TBD
+            self.fps[i] = 60 #TBD
             w =self.image_size.width
             h =self.image_size.height
             err = self.zed.grab(self.runtime)
@@ -454,7 +454,7 @@ class LoadStreams:
                 #     LOGGER.warning('WARNING ⚠️ Video stream unresponsive, please check your IP camera connection.')
                 #     self.imgs[i] = np.zeros_like(self.imgs[i])
                 #     cap.open(stream)  # re-open stream if signal was lost
-            time.sleep(0.03)  # wait time #TBD
+            time.sleep(0.015)  # wait time #TBD
 
     def get_depth(self):
         img = None
