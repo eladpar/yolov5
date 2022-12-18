@@ -408,12 +408,11 @@ class LoadStreams:
             # fps = cap.get(cv2.CAP_PROP_FPS)  # warning: may return 0 or nan
             # self.frames[i] = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')  # infinite stream fallback
             # self.fps[i] = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
-            self.frames[i] = float('inf')
-            self.fps[i] = 30
-            w =640
-            h =640
-            # _, self.imgs[i] = cap.read()  # guarantee first frame
             ###################Elad######################
+            self.frames[i] = float('inf')
+            self.fps[i] = 30 #TBD
+            w =self.image_size.width
+            h =self.image_size.height
             err = self.zed.grab(self.runtime)
             if err == sl.ERROR_CODE.SUCCESS:
                 self.zed.retrieve_image(self.image_zed, sl.VIEW.LEFT, sl.MEM.CPU, self.image_size)
