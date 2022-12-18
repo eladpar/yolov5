@@ -368,7 +368,7 @@ class LoadStreams:
             if s == 0:
                 assert not is_colab(), '--source 0 webcam unsupported on Colab. Rerun command in a local environment.'
                 assert not is_kaggle(), '--source 0 webcam unsupported on Kaggle. Rerun command in a local environment.'
-            cap = cv2.VideoCapture(s)
+            # cap = cv2.VideoCapture(s)
 
 
             ########################################################################################################################
@@ -402,13 +402,16 @@ class LoadStreams:
             ###########################################################################################################################
 
 
-            assert cap.isOpened(), f'{st}Failed to open {s}'
-            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)  # warning: may return 0 or nan
-            self.frames[i] = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')  # infinite stream fallback
-            self.fps[i] = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
-
+            # assert cap.isOpened(), f'{st}Failed to open {s}'
+            # w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            # h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            # fps = cap.get(cv2.CAP_PROP_FPS)  # warning: may return 0 or nan
+            # self.frames[i] = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')  # infinite stream fallback
+            # self.fps[i] = max((fps if math.isfinite(fps) else 0) % 100, 0) or 30  # 30 FPS fallback
+            self.frames[i] = float('inf')
+            self.fps[i] = 30
+            w =640
+            h =640
             # _, self.imgs[i] = cap.read()  # guarantee first frame
             ###################Elad######################
             err = self.zed.grab(self.runtime)
@@ -418,7 +421,7 @@ class LoadStreams:
                 self.imgs[i] =  img
             #############################################
             
-            self.threads[i] = Thread(target=self.update, args=([i, cap, s]), daemon=True)
+            self.threads[i] = Thread(target=self.update, args=([i, 0, s]), daemon=True)
             LOGGER.info(f"{st} Success ({self.frames[i]} frames {w}x{h} at {self.fps[i]:.2f} FPS)")
             self.threads[i].start()
         LOGGER.info('')  # newline
@@ -434,9 +437,9 @@ class LoadStreams:
     def update(self, i, cap, stream):
         # Read stream `i` frames in daemon thread
         n, f = 0, self.frames[i]  # frame number, frame array
-        while cap.isOpened() and n < f:
+        while  n < f:
             n += 1
-            cap.grab()  # .read() = .grab() followed by .retrieve()
+            # cap.grab()  # .read() = .grab() followed by .retrieve()
             if n % self.vid_stride == 0:
                 # success, im = cap.retrieve()
                 #########################Elad#######################
@@ -452,7 +455,7 @@ class LoadStreams:
                 #     LOGGER.warning('WARNING ⚠️ Video stream unresponsive, please check your IP camera connection.')
                 #     self.imgs[i] = np.zeros_like(self.imgs[i])
                 #     cap.open(stream)  # re-open stream if signal was lost
-            time.sleep(0.0)  # wait time
+            time.sleep(0.01)  # wait time #TBD
 
     def get_depth(self):
         img = None
