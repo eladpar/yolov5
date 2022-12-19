@@ -178,19 +178,19 @@ def run(
                             label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                             
 
-                            depth = dataset.get_depth()
-                            # depth = depth.cpu().copy()
-                            depth_array = np.array(depth, dtype=np.float32)
-                            ##############################Elad########################################################################
-                            box = xyxy
-                            p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-                            center_x = (box[0] +box[2]) /2
-                            center_y = (box[0] +box[2]) /2
-                            center_x_cpu = int(center_x.cpu())
-                            center_y_cpu = int(center_y.cpu())
-                            depth_calc = depth[center_x_cpu][center_y_cpu]
-                            # print(f"label is {label} and center_x is {center_x} center_y is {center_y} and depth value is {depth_calc[0]}")
-                            label = label + " " + str(depth_calc)
+                            # depth = dataset.get_depth()
+                            # # depth = depth.cpu().copy()
+                            # depth_array = np.array(depth, dtype=np.float32)
+                            # ##############################Elad########################################################################
+                            # box = xyxy
+                            # p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+                            # center_x = (box[0] +box[2]) /2
+                            # center_y = (box[0] +box[2]) /2
+                            # center_x_cpu = int(center_x.cpu())
+                            # center_y_cpu = int(center_y.cpu())
+                            # depth_calc = depth[center_x_cpu][center_y_cpu]
+                            # # print(f"label is {label} and center_x is {center_x} center_y is {center_y} and depth value is {depth_calc[0]}")
+                            # label = label + " " + str(depth_calc)
                             ########################################################################################################
                             annotator.box_label(xyxy, label, color=colors(c, True))
                         if save_crop:
@@ -204,10 +204,10 @@ def run(
                         cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
                         cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
                     cv2.imshow(str(p), im0)
-                    try:
-                        cv2.imshow("depth", depth)
-                    except:
-                        pass
+                    # try:
+                    #     cv2.imshow("depth", depth)
+                    # except:
+                    #     pass
                     cv2.waitKey(1)  # 1 millisecond
 
                 # Save results (image with detections)

@@ -30,7 +30,8 @@ from tqdm import tqdm
 
 ##############################
 ##############################
-import pyzed.sl as sl
+import pyrealsense2 as rs
+
 ###########################
 #########################
 
@@ -373,32 +374,32 @@ class LoadStreams:
 
             ########################################################################################################################
             ######ELAD##############################################################################################################
+            # Configure depth and color streams
+            self.pipeline = rs.pipeline()
+            self.config = rs.config()
 
-            self.zed = sl.Camera()
+            # Get device product line for setting a supporting resolution
+            pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+            pipeline_profile = self.config.resolve(pipeline_wrapper)
+            device = pipeline_profile.get_device()
+            device_product_line = str(device.get_info(rs.camera_info.product_line))
 
-            input_type = sl.InputType()
-            init = sl.InitParameters(input_t=input_type)
-            init.camera_resolution = sl.RESOLUTION.HD720
-            init.depth_mode = sl.DEPTH_MODE.PERFORMANCE
-            init.coordinate_units = sl.UNIT.MILLIMETER
+            found_rgb = False
+            for s in device.sensors:
+                if s.get_info(rs.camera_info.name) == 'RGB Camera':
+                    found_rgb = True
+                    break
+            if not found_rgb:
+                print("The demo requires Depth camera with Color sensor")
+                exit(0)
+            w =480
+            h =640
+            self.config.enable_stream(rs.stream.color, h, w, rs.format.bgr8, 30)
 
-            # Open the camera
-            err = self.zed.open(init)
-            if err != sl.ERROR_CODE.SUCCESS :
-                print(repr(err))
-                self.zed.close()
-                exit(1)
-            # Set runtime parameters after opening the camera
-            self.runtime = sl.RuntimeParameters()
-            self.runtime.sensing_mode = sl.SENSING_MODE.STANDARD
-            # Prepare new image size to retrieve half-resolution images
-            self.image_size = self.zed.get_camera_information().camera_resolution
-            self.image_size.width = 640
-            self.image_size.height = 640
-            # Declare your sl.Mat matrices
-            self.image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
-            self.depth_image_zed = sl.Mat(self.image_size.width, self.image_size.height, sl.MAT_TYPE.U8_C4)
-            ##########################################################################################################################
+            # Start streaming
+            self.pipeline.start(self.config)
+
+                ##########################################################################################################################
             ###########################################################################################################################
 
 
@@ -411,13 +412,11 @@ class LoadStreams:
             ###################Elad######################
             self.frames[i] = float('inf')
             self.fps[i] = 30 #TBD
-            w =self.image_size.width
-            h =self.image_size.height
-            err = self.zed.grab(self.runtime)
-            if err == sl.ERROR_CODE.SUCCESS:
-                self.zed.retrieve_image(self.image_zed, sl.VIEW.LEFT, sl.MEM.CPU, self.image_size)
-                img = cv2.cvtColor(self.image_zed.get_data(), cv2.COLOR_BGRA2BGR)
-                self.imgs[i] =  img
+            frames = self.pipeline.wait_for_frames()
+            color_frame = frames.get_color_frame()
+            img = np.asanyarray(color_frame.get_data())
+
+            self.imgs[i] =  img
             #############################################
             
             self.threads[i] = Thread(target=self.update, args=([i, 0, s]), daemon=True)
@@ -442,11 +441,10 @@ class LoadStreams:
             if n % self.vid_stride == 0:
                 # success, im = cap.retrieve()
                 #########################Elad#######################
-                err = self.zed.grab(self.runtime)
-                if err == sl.ERROR_CODE.SUCCESS:
-                    self.zed.retrieve_image(self.image_zed, sl.VIEW.LEFT, sl.MEM.CPU, self.image_size)
-                    img= cv2.cvtColor(self.image_zed.get_data(), cv2.COLOR_BGRA2BGR)
-                    self.imgs[i] =  img
+                frames = self.pipeline.wait_for_frames()
+                color_frame = frames.get_color_frame()
+                img = np.asanyarray(color_frame.get_data())
+                self.imgs[i] =  img
                 # ##############################################
                 # if success:
                 #     self.imgs[i] = im
@@ -474,6 +472,8 @@ class LoadStreams:
         self.count += 1
         if not all(x.is_alive() for x in self.threads) or cv2.waitKey(1) == ord('q'):  # q to quit
             cv2.destroyAllWindows()
+            self.pipeline.stop()
+
             raise StopIteration
 
         im0 = self.imgs.copy()
