@@ -395,6 +395,7 @@ class LoadStreams:
             w =480
             h =640
             self.config.enable_stream(rs.stream.color, h, w, rs.format.bgr8, 30)
+            self.config.enable_stream(rs.stream.depth, h, w, rs.format.z16, 30)
 
             # Start streaming
             self.pipeline.start(self.config)
@@ -444,7 +445,7 @@ class LoadStreams:
                 frames = self.pipeline.wait_for_frames()
                 color_frame = frames.get_color_frame()
                 if not color_frame:
-                    LOGGER.warning('WARNING ⚠️ realsense Video stream unresponsive, please check your IP camera connection.')
+                    LOGGER.warning('WARNING ⚠️ realsense RGB Video stream unresponsive, please check your IP camera connection.')
                     return
                 img = np.asanyarray(color_frame.get_data())
                 self.imgs[i] =  img
@@ -459,13 +460,15 @@ class LoadStreams:
 
     def get_depth(self):
         img = None
-        err = self.zed.grab(self.runtime)
-        if err == sl.ERROR_CODE.SUCCESS:
-            # self.zed.retrieve_image(self.depth_image_zed, sl.VIEW.DEPTH, sl.MEM.CPU, self.image_size)
-            self.zed.retrieve_measure(self.depth_image_zed, sl.MEASURE.DEPTH, sl.MEM.CPU, self.image_size)
-            data = self.depth_image_zed.get_data()
-            # img= cv2.cvtColor(self.depth_image_zed.get_data(), cv2.COLOR_BGRA2BGR)
-        return data
+        frames = self.pipeline.wait_for_frames()
+        depth_frame = frames.get_depth_frame()
+        if not depth_frame:
+            LOGGER.warning('WARNING ⚠️ realsense Video stream unresponsive, please check your IP camera connection.')
+            return
+        depth_image = np.asanyarray(depth_frame.get_data())
+        # data = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+        # img= cv2.cvtColor(self.depth_image_zed.get_data(), cv2.COLOR_BGRA2BGR)
+        return depth_image
 
     def __iter__(self):
         self.count = -1

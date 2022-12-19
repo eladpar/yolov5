@@ -177,21 +177,20 @@ def run(
                             c = int(cls)  # integer class
                             label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                             
+                            ##############################Elad########################################################################
 
-                            # depth = dataset.get_depth()
-                            # # depth = depth.cpu().copy()
-                            # depth_array = np.array(depth, dtype=np.float32)
-                            # ##############################Elad########################################################################
-                            # box = xyxy
-                            # p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-                            # center_x = (box[0] +box[2]) /2
-                            # center_y = (box[0] +box[2]) /2
-                            # center_x_cpu = int(center_x.cpu())
-                            # center_y_cpu = int(center_y.cpu())
-                            # depth_calc = depth[center_x_cpu][center_y_cpu]
-                            # # print(f"label is {label} and center_x is {center_x} center_y is {center_y} and depth value is {depth_calc[0]}")
-                            # label = label + " " + str(depth_calc)
-                            ########################################################################################################
+                            depth = dataset.get_depth()
+                            box = xyxy
+                            center_x = (box[0] +box[2]) /2
+                            center_y = (box[0] +box[2]) /2
+                            center_x_cpu = int(center_x.cpu())
+                            center_y_cpu = int(center_y.cpu())
+                            if center_y_cpu > 479 or center_x_cpu > 639:
+                                depth_calc = -1
+                            else:
+                                depth_calc = depth[center_y_cpu][center_x_cpu]
+                            label = label + " " + str(depth_calc)
+                            #######################################################################################################
                             annotator.box_label(xyxy, label, color=colors(c, True))
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
