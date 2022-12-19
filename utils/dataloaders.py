@@ -443,6 +443,9 @@ class LoadStreams:
                 #########################Elad#######################
                 frames = self.pipeline.wait_for_frames()
                 color_frame = frames.get_color_frame()
+                if not color_frame:
+                    LOGGER.warning('WARNING ⚠️ realsense Video stream unresponsive, please check your IP camera connection.')
+                    return
                 img = np.asanyarray(color_frame.get_data())
                 self.imgs[i] =  img
                 # ##############################################
